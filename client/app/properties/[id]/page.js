@@ -3,12 +3,22 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { API_BASE_URL, getApiErrorMessage } from "../../../lib/api";
 
 export default function PropertyDetailsPage() {
   const { id } = useParams();
   const [property, setProperty] = useState(null);
+  const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [reviewMessage, setReviewMessage] = useState("");
+  const [reviewError, setReviewError] = useState("");
+  const [formData, setFormData] = useState({
+    reviewer_name: "",
+    rating: "5",
+    comment: ""
+  });
 
   function getDisplayValue(value, fallback = "Not added yet") {
     if (value === undefined || value === null || value === "") {
@@ -18,31 +28,94 @@ export default function PropertyDetailsPage() {
     return value;
   }
 
+  const averageRating = reviews.length
+    ? (reviews.reduce((total, review) => total + review.rating, 0) / reviews.length).toFixed(1)
+    : null;
+
   useEffect(() => {
-    async function fetchProperty() {
+    async function fetchPropertyAndReviews() {
       try {
         setLoading(true);
         setError("");
 
-        const res = await fetch(`http://127.0.0.1:8000/api/properties/${id}`);
+        const propertyRes = await fetch(`${API_BASE_URL}/api/properties/${id}`);
 
-        if (!res.ok) {
+        if (!propertyRes.ok) {
           throw new Error("Property not found");
         }
 
-        const data = await res.json();
-        setProperty(data);
+        const propertyData = await propertyRes.json();
+        setProperty(propertyData);
+
+        const reviewRes = await fetch(`${API_BASE_URL}/api/reviews/property/${id}`);
+
+        if (reviewRes.ok) {
+          const reviewData = await reviewRes.json();
+          setReviews(reviewData);
+        } else {
+          setReviews([]);
+        }
       } catch (err) {
-        setError(err.message || "Something went wrong");
+        setError(getApiErrorMessage(err, "Could not load property details"));
       } finally {
         setLoading(false);
       }
     }
 
     if (id) {
-      fetchProperty();
+      fetchPropertyAndReviews();
     }
   }, [id]);
+
+  async function handleReviewSubmit(e) {
+    e.preventDefault();
+
+    try {
+      setSubmittingReview(true);
+      setReviewMessage("");
+      setReviewError("");
+
+      const res = await fetch(`${API_BASE_URL}/api/reviews/add`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          property: id,
+          reviewer_name: formData.reviewer_name,
+          rating: Number(formData.rating),
+          comment: formData.comment
+        })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Could not submit review");
+      }
+
+      setReviews((currentReviews) => [data, ...currentReviews]);
+      setFormData({
+        reviewer_name: "",
+        rating: "5",
+        comment: ""
+      });
+      setReviewMessage("Review added successfully.");
+    } catch (err) {
+      setReviewError(getApiErrorMessage(err, "Could not submit review"));
+    } finally {
+      setSubmittingReview(false);
+    }
+  }
+
+  function handleInputChange(e) {
+    const { name, value } = e.target;
+
+    setFormData((currentFormData) => ({
+      ...currentFormData,
+      [name]: value
+    }));
+  }
 
   if (loading) {
     return (
@@ -97,6 +170,9 @@ export default function PropertyDetailsPage() {
             <span className="rounded-full bg-white/20 px-4 py-2 text-sm font-medium backdrop-blur">
               Type: {getDisplayValue(property.property_type)}
             </span>
+            <span className="rounded-full bg-white/20 px-4 py-2 text-sm font-medium backdrop-blur">
+              Reviews: {reviews.length}
+            </span>
           </div>
         </div>
 
@@ -145,28 +221,167 @@ export default function PropertyDetailsPage() {
 
           <div className="rounded-3xl border border-emerald-100 bg-emerald-50 p-6">
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-700">
-              Coming Next
+              Review Summary
             </p>
             <h2 className="mt-3 text-2xl font-bold text-slate-900">
-              Reviews will fit naturally here
+              Student feedback starts here
             </h2>
             <p className="mt-3 text-sm leading-6 text-slate-600">
-              This page is now ready for the next small feature: student reviews for a
-              single property. We already have the property id in the URL, so adding
-              reviews later will be much easier.
+              This property can now collect reviews from students. That gives NeighborNet
+              its core value: real experiences tied to a real place.
             </p>
 
             <div className="mt-6 space-y-3">
               <div className="rounded-2xl bg-white p-4 shadow-sm">
-                <p className="text-sm font-medium text-slate-500">Future section</p>
-                <p className="mt-1 font-semibold text-slate-900">Average rating and review count</p>
+                <p className="text-sm font-medium text-slate-500">Average rating</p>
+                <p className="mt-1 text-3xl font-bold text-slate-900">
+                  {averageRating ? `${averageRating}/5` : "No ratings yet"}
+                </p>
               </div>
 
               <div className="rounded-2xl bg-white p-4 shadow-sm">
-                <p className="text-sm font-medium text-slate-500">Future section</p>
-                <p className="mt-1 font-semibold text-slate-900">Student comments about heat, noise, and safety</p>
+                <p className="text-sm font-medium text-slate-500">Total reviews</p>
+                <p className="mt-1 text-3xl font-bold text-slate-900">{reviews.length}</p>
+              </div>
+
+              <div className="rounded-2xl bg-white p-4 shadow-sm">
+                <p className="text-sm font-medium text-slate-500">Next up</p>
+                <p className="mt-1 font-semibold text-slate-900">
+                  Later we can add issue tags like heat, noise, safety, and pests.
+                </p>
               </div>
             </div>
+          </div>
+        </div>
+
+        <div className="grid gap-6 border-t border-slate-200 px-8 py-8 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+                  Reviews
+                </p>
+                <h2 className="mt-2 text-2xl font-bold text-slate-900">
+                  What students are saying
+                </h2>
+              </div>
+
+              <div className="rounded-2xl bg-white px-4 py-3 text-right shadow-sm">
+                <p className="text-sm text-slate-500">Average</p>
+                <p className="text-xl font-bold text-slate-900">
+                  {averageRating ? `${averageRating}/5` : "No ratings"}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 space-y-4">
+              {reviews.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-slate-500">
+                  No reviews yet. Be the first student to leave one.
+                </div>
+              ) : (
+                reviews.map((review) => (
+                  <div key={review._id} className="rounded-2xl bg-white p-5 shadow-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-slate-900">
+                          {getDisplayValue(review.reviewer_name, "Anonymous Student")}
+                        </p>
+                        <p className="mt-1 text-sm text-slate-500">
+                          {new Date(review.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+
+                      <div className="rounded-full bg-emerald-100 px-3 py-1 text-sm font-semibold text-emerald-700">
+                        Rating: {review.rating}/5
+                      </div>
+                    </div>
+
+                    <p className="mt-4 leading-7 text-slate-700">{review.comment}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+              Add Review
+            </p>
+            <h2 className="mt-2 text-2xl font-bold text-slate-900">
+              Share your experience
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              Keep this simple for now: name, rating, and one honest comment.
+            </p>
+
+            <form onSubmit={handleReviewSubmit} className="mt-6 space-y-4">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Your Name
+                </label>
+                <input
+                  name="reviewer_name"
+                  value={formData.reviewer_name}
+                  onChange={handleInputChange}
+                  placeholder="Optional name"
+                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-emerald-400"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Rating
+                </label>
+                <select
+                  name="rating"
+                  value={formData.rating}
+                  onChange={handleInputChange}
+                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-emerald-400"
+                >
+                  <option value="5">5 - Excellent</option>
+                  <option value="4">4 - Good</option>
+                  <option value="3">3 - Okay</option>
+                  <option value="2">2 - Poor</option>
+                  <option value="1">1 - Very bad</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Comment
+                </label>
+                <textarea
+                  name="comment"
+                  value={formData.comment}
+                  onChange={handleInputChange}
+                  placeholder="What should other students know about this place?"
+                  rows="5"
+                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-emerald-400"
+                  required
+                />
+              </div>
+
+              {reviewMessage ? (
+                <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                  {reviewMessage}
+                </p>
+              ) : null}
+
+              {reviewError ? (
+                <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {reviewError}
+                </p>
+              ) : null}
+
+              <button
+                type="submit"
+                disabled={submittingReview}
+                className="w-full rounded-2xl bg-teal-500 px-4 py-3 font-semibold text-white transition hover:bg-teal-600 disabled:cursor-not-allowed disabled:bg-slate-300"
+              >
+                {submittingReview ? "Submitting review..." : "Submit Review"}
+              </button>
+            </form>
           </div>
         </div>
       </section>

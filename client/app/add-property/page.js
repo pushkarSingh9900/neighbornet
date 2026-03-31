@@ -1,62 +1,94 @@
 "use client";
 
 import { useState } from "react";
+import { API_BASE_URL, getApiErrorMessage } from "../../lib/api";
 
 export default function AddProperty() {
-
   const [area, setArea] = useState("");
   const [rent, setRent] = useState("");
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
 
-    const res = await fetch("http://localhost:8000/api/properties/add", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        area: area,
-        rent_range: rent
-      })
-    });
+    try {
+      setSubmitting(true);
+      setMessage("");
+      setError("");
 
-    const data = await res.json();
-    console.log(data);
+      const res = await fetch(`${API_BASE_URL}/api/properties/add`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          area,
+          rent_range: rent
+        })
+      });
 
-    alert("Property added!");
+      const data = await res.json();
 
-    setArea("");
-    setRent("");
+      if (!res.ok) {
+        throw new Error(data.message || "Could not add property");
+      }
+
+      setMessage("Property added successfully.");
+      setArea("");
+      setRent("");
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Could not add property"));
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
-    <div className="p-10">
+    <div className="max-w-2xl rounded-[32px] border border-slate-200 bg-white p-8 shadow-sm">
+      <h1 className="text-3xl font-bold text-slate-900">Add Property</h1>
+      <p className="mt-2 text-slate-500">
+        Start simple for now: area and rent range.
+      </p>
 
-      <h1 className="text-3xl font-bold mb-6">Add Property</h1>
-
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="mt-8 space-y-4">
 
         <input
-          className="border p-2 block"
+          className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-emerald-400"
           placeholder="Area"
           value={area}
           onChange={(e) => setArea(e.target.value)}
+          required
         />
 
         <input
-          className="border p-2 block"
+          className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-emerald-400"
           placeholder="Rent Range"
           value={rent}
           onChange={(e) => setRent(e.target.value)}
         />
 
-        <button className="bg-blue-500 text-white px-4 py-2">
-          Add Property
+        {message ? (
+          <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            {message}
+          </p>
+        ) : null}
+
+        {error ? (
+          <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </p>
+        ) : null}
+
+        <button
+          type="submit"
+          disabled={submitting}
+          className="rounded-2xl bg-teal-500 px-5 py-3 font-semibold text-white transition hover:bg-teal-600 disabled:cursor-not-allowed disabled:bg-slate-300"
+        >
+          {submitting ? "Adding..." : "Add Property"}
         </button>
-
       </form>
-
     </div>
   );
 }
