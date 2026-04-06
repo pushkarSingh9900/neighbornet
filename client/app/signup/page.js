@@ -67,7 +67,7 @@ export default function SignupPage() {
 
       saveAuthSession(data);
       setMessage("Account created successfully. Redirecting...");
-      router.push("/properties");
+      router.push(data.user.role === "admin" ? "/admin" : "/properties");
       router.refresh();
     } catch (err) {
       setError(getApiErrorMessage(err, "Could not create account"));

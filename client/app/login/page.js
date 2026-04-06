@@ -53,7 +53,7 @@ export default function LoginPage() {
 
       saveAuthSession(data);
       setMessage("Login successful. Redirecting...");
-      router.push("/properties");
+      router.push(data.user.role === "admin" ? "/admin" : "/properties");
       router.refresh();
     } catch (err) {
       setError(getApiErrorMessage(err, "Could not log in"));

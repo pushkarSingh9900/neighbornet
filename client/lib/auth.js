@@ -40,3 +40,7 @@ export function clearAuthSession() {
   window.localStorage.removeItem(AUTH_STORAGE_KEY);
   window.dispatchEvent(new Event("auth-changed"));
 }
+
+export function isAdminUser(user) {
+  return user?.role === "admin";
+}

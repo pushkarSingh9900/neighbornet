@@ -2,6 +2,7 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const router = express.Router();
+const { isAdminEmail } = require("../middleware/authMiddleware");
 const User = require("../models/User");
 
 const LAKEHEAD_EMAIL_DOMAIN = "@lakeheadu.ca";
@@ -11,10 +12,13 @@ function isLakeheadEmail(email = "") {
 }
 
 function buildAuthResponse(user) {
+  const role = isAdminEmail(user.email) ? "admin" : "student";
+
   const token = jwt.sign(
     {
       userId: user._id,
-      email: user.email
+      email: user.email,
+      role
     },
     process.env.JWT_SECRET || "neighbornet-student-project-secret",
     { expiresIn: "7d" }
@@ -26,7 +30,8 @@ function buildAuthResponse(user) {
     user: {
       id: user._id,
       name: user.name,
-      email: user.email
+      email: user.email,
+      role
     }
   };
 }

@@ -4,20 +4,40 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { API_BASE_URL, getApiErrorMessage } from "../../../lib/api";
+import { getAuthSession } from "../../../lib/auth";
+
+const ISSUE_TYPE_OPTIONS = [
+  { value: "mold", label: "Mold" },
+  { value: "pests", label: "Pests" },
+  { value: "heat", label: "Heat" },
+  { value: "noise", label: "Noise" },
+  { value: "safety", label: "Safety" },
+  { value: "maintenance", label: "Maintenance" },
+  { value: "other", label: "Other" }
+];
 
 export default function PropertyDetailsPage() {
   const { id } = useParams();
   const [property, setProperty] = useState(null);
   const [reviews, setReviews] = useState([]);
+  const [issues, setIssues] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [submittingReview, setSubmittingReview] = useState(false);
   const [reviewMessage, setReviewMessage] = useState("");
   const [reviewError, setReviewError] = useState("");
+  const [submittingIssue, setSubmittingIssue] = useState(false);
+  const [issueMessage, setIssueMessage] = useState("");
+  const [issueError, setIssueError] = useState("");
+  const [currentUser, setCurrentUser] = useState(null);
   const [formData, setFormData] = useState({
     reviewer_name: "",
     rating: "5",
     comment: ""
+  });
+  const [issueFormData, setIssueFormData] = useState({
+    issue_type: "mold",
+    description: ""
   });
 
   function getDisplayValue(value, fallback = "Not added yet") {
@@ -31,8 +51,12 @@ export default function PropertyDetailsPage() {
   const averageRating = reviews.length
     ? (reviews.reduce((total, review) => total + review.rating, 0) / reviews.length).toFixed(1)
     : null;
+  const openIssueCount = issues.filter((issue) => issue.status === "open").length;
 
   useEffect(() => {
+    const authSession = getAuthSession();
+    setCurrentUser(authSession?.user || null);
+
     async function fetchPropertyAndReviews() {
       try {
         setLoading(true);
@@ -54,6 +78,15 @@ export default function PropertyDetailsPage() {
           setReviews(reviewData);
         } else {
           setReviews([]);
+        }
+
+        const issueRes = await fetch(`${API_BASE_URL}/api/issues/property/${id}`);
+
+        if (issueRes.ok) {
+          const issueData = await issueRes.json();
+          setIssues(issueData);
+        } else {
+          setIssues([]);
         }
       } catch (err) {
         setError(getApiErrorMessage(err, "Could not load property details"));
@@ -117,6 +150,55 @@ export default function PropertyDetailsPage() {
     }));
   }
 
+  function handleIssueInputChange(e) {
+    const { name, value } = e.target;
+
+    setIssueFormData((currentIssueFormData) => ({
+      ...currentIssueFormData,
+      [name]: value
+    }));
+  }
+
+  async function handleIssueSubmit(e) {
+    e.preventDefault();
+
+    try {
+      setSubmittingIssue(true);
+      setIssueMessage("");
+      setIssueError("");
+
+      const res = await fetch(`${API_BASE_URL}/api/issues/add`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          property: id,
+          issue_type: issueFormData.issue_type,
+          description: issueFormData.description,
+          reported_by: currentUser?.email || "Anonymous Student"
+        })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Could not report issue");
+      }
+
+      setIssues((currentIssues) => [data, ...currentIssues]);
+      setIssueFormData({
+        issue_type: "mold",
+        description: ""
+      });
+      setIssueMessage("Issue reported successfully.");
+    } catch (err) {
+      setIssueError(getApiErrorMessage(err, "Could not report issue"));
+    } finally {
+      setSubmittingIssue(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
@@ -172,6 +254,9 @@ export default function PropertyDetailsPage() {
             </span>
             <span className="rounded-full bg-white/20 px-4 py-2 text-sm font-medium backdrop-blur">
               Reviews: {reviews.length}
+            </span>
+            <span className="rounded-full bg-white/20 px-4 py-2 text-sm font-medium backdrop-blur">
+              Open issues: {openIssueCount}
             </span>
           </div>
         </div>
@@ -245,10 +330,8 @@ export default function PropertyDetailsPage() {
               </div>
 
               <div className="rounded-2xl bg-white p-4 shadow-sm">
-                <p className="text-sm font-medium text-slate-500">Next up</p>
-                <p className="mt-1 font-semibold text-slate-900">
-                  Later we can add issue tags like heat, noise, safety, and pests.
-                </p>
+                <p className="text-sm font-medium text-slate-500">Open issues</p>
+                <p className="mt-1 text-3xl font-bold text-slate-900">{openIssueCount}</p>
               </div>
             </div>
           </div>
@@ -380,6 +463,130 @@ export default function PropertyDetailsPage() {
                 className="w-full rounded-2xl bg-teal-500 px-4 py-3 font-semibold text-white transition hover:bg-teal-600 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
                 {submittingReview ? "Submitting review..." : "Submit Review"}
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <div className="grid gap-6 border-t border-slate-200 px-8 py-8 lg:grid-cols-[1.1fr_0.9fr]">
+          <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+                  Issues
+                </p>
+                <h2 className="mt-2 text-2xl font-bold text-slate-900">
+                  Reported property issues
+                </h2>
+              </div>
+
+              <div className="rounded-2xl bg-white px-4 py-3 text-right shadow-sm">
+                <p className="text-sm text-slate-500">Open issues</p>
+                <p className="text-xl font-bold text-slate-900">{openIssueCount}</p>
+              </div>
+            </div>
+
+            <div className="mt-6 space-y-4">
+              {issues.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-slate-500">
+                  No issues have been reported for this property yet.
+                </div>
+              ) : (
+                issues.map((issue) => (
+                  <div key={issue._id} className="rounded-2xl bg-white p-5 shadow-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="font-semibold capitalize text-slate-900">
+                          {issue.issue_type}
+                        </p>
+                        <p className="mt-1 text-sm text-slate-500">
+                          Reported by {getDisplayValue(issue.reported_by, "Anonymous Student")} on{" "}
+                          {new Date(issue.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+
+                      <div className="rounded-full bg-amber-100 px-3 py-1 text-sm font-semibold text-amber-700 capitalize">
+                        {issue.status}
+                      </div>
+                    </div>
+
+                    <p className="mt-4 leading-7 text-slate-700">{issue.description}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+              Report Issue
+            </p>
+            <h2 className="mt-2 text-2xl font-bold text-slate-900">
+              Help other students stay informed
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              Report problems like mold, pests, heat, or safety concerns so future renters
+              know what to expect.
+            </p>
+
+            {currentUser ? (
+              <p className="mt-4 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                Reporting as {currentUser.email}
+              </p>
+            ) : null}
+
+            <form onSubmit={handleIssueSubmit} className="mt-6 space-y-4">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Issue Type
+                </label>
+                <select
+                  name="issue_type"
+                  value={issueFormData.issue_type}
+                  onChange={handleIssueInputChange}
+                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-emerald-400"
+                >
+                  {ISSUE_TYPE_OPTIONS.map((issueTypeOption) => (
+                    <option key={issueTypeOption.value} value={issueTypeOption.value}>
+                      {issueTypeOption.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Description
+                </label>
+                <textarea
+                  name="description"
+                  value={issueFormData.description}
+                  onChange={handleIssueInputChange}
+                  placeholder="Describe the issue students should know about"
+                  rows="5"
+                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-emerald-400"
+                  required
+                />
+              </div>
+
+              {issueMessage ? (
+                <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                  {issueMessage}
+                </p>
+              ) : null}
+
+              {issueError ? (
+                <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {issueError}
+                </p>
+              ) : null}
+
+              <button
+                type="submit"
+                disabled={submittingIssue}
+                className="w-full rounded-2xl bg-slate-900 px-4 py-3 font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+              >
+                {submittingIssue ? "Reporting issue..." : "Report Issue"}
               </button>
             </form>
           </div>

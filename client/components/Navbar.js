@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { clearAuthSession, getAuthSession } from "../lib/auth";
+import { clearAuthSession, getAuthSession, isAdminUser } from "../lib/auth";
 
 export default function Navbar() {
   const [user, setUser] = useState(null);
@@ -57,6 +57,15 @@ export default function Navbar() {
 
           {user ? (
             <>
+              {isAdminUser(user) ? (
+                <Link
+                  href="/admin"
+                  className="rounded-full border border-amber-200 bg-amber-50 px-4 py-2 font-semibold text-amber-700 transition hover:bg-amber-100"
+                >
+                  Admin
+                </Link>
+              ) : null}
+
               <div className="rounded-full border border-slate-200 px-4 py-2 text-slate-700">
                 {user.name}
               </div>
