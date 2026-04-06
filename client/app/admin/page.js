@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { API_BASE_URL, getApiErrorMessage } from "../../lib/api";
-import { getAuthSession, isAdminUser } from "../../lib/auth";
+import { fetchAdminDashboard, summarizeIssues } from "../../lib/admin";
+import { canUseAdminFeatures, getAuthSession, hasAuthToken, isAdminUser } from "../../lib/auth";
 
 export default function AdminPage() {
   const [authSession, setAuthSession] = useState(null);
@@ -21,22 +22,19 @@ export default function AdminPage() {
         setLoading(true);
         setError("");
 
-        if (!session?.token || !isAdminUser(session.user)) {
+        if (!session?.user) {
+          throw new Error("Log in first to access the admin dashboard.");
+        }
+
+        if (isAdminUser(session.user) && !hasAuthToken(session)) {
+          throw new Error("Your admin profile is loaded, but this browser session is incomplete. Log out and log in again.");
+        }
+
+        if (!canUseAdminFeatures(session)) {
           throw new Error("Admin access required. Add your Lakehead email to ADMIN_EMAILS in server/.env and log in again.");
         }
 
-        const res = await fetch(`${API_BASE_URL}/api/admin/dashboard`, {
-          headers: {
-            Authorization: `Bearer ${session.token}`
-          }
-        });
-
-        const data = await res.json();
-
-        if (!res.ok) {
-          throw new Error(data.message || "Could not load admin dashboard");
-        }
-
+        const data = await fetchAdminDashboard(session.token);
         setDashboardData(data);
       } catch (err) {
         setError(getApiErrorMessage(err, "Could not load admin dashboard"));
@@ -78,8 +76,7 @@ export default function AdminPage() {
           issues: updatedIssues,
           summary: {
             ...currentDashboardData.summary,
-            openIssues: updatedIssues.filter((issue) => issue.status !== "resolved").length,
-            resolvedIssues: updatedIssues.filter((issue) => issue.status === "resolved").length
+            ...summarizeIssues(updatedIssues)
           }
         };
       });
@@ -156,8 +153,7 @@ export default function AdminPage() {
           summary: {
             properties: remainingProperties.length,
             reviews: remainingReviews.length,
-            openIssues: remainingIssues.filter((issue) => issue.status !== "resolved").length,
-            resolvedIssues: remainingIssues.filter((issue) => issue.status === "resolved").length
+            ...summarizeIssues(remainingIssues)
           },
           properties: remainingProperties,
           reviews: remainingReviews,
@@ -185,8 +181,8 @@ export default function AdminPage() {
         <h1 className="text-3xl font-bold text-slate-900">Admin Dashboard</h1>
         <p className="mt-4 text-red-600">{error}</p>
         <p className="mt-2 text-sm text-slate-500">
-          Add your admin email to `ADMIN_EMAILS` in `server/.env`, restart the backend,
-          and sign in again.
+          If you already see an admin label elsewhere, your saved browser session is probably old.
+          Log out, log back in, and then open `/admin` again.
         </p>
       </div>
     );
@@ -231,9 +227,14 @@ export default function AdminPage() {
           <p className="mt-3 text-4xl font-bold text-slate-900">{summary.openIssues}</p>
         </div>
 
+        <div className="rounded-3xl border border-sky-200 bg-sky-50 p-6 shadow-sm">
+          <p className="text-sm text-sky-700">In review</p>
+          <p className="mt-3 text-4xl font-bold text-slate-900">{summary.reviewingIssues}</p>
+        </div>
+
         <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-6 shadow-sm">
-          <p className="text-sm text-emerald-700">Resolved issues</p>
-          <p className="mt-3 text-4xl font-bold text-slate-900">{summary.resolvedIssues}</p>
+          <p className="text-sm text-emerald-700">Closed reports</p>
+          <p className="mt-3 text-4xl font-bold text-slate-900">{summary.closedIssues}</p>
         </div>
       </section>
 
@@ -290,7 +291,7 @@ export default function AdminPage() {
                       onClick={() => handleIssueStatusChange(issue._id, "resolved")}
                       className="rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-600"
                     >
-                      Resolve
+                      Close
                     </button>
 
                     <button

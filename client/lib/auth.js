@@ -10,7 +10,9 @@ export function saveAuthSession(authData) {
     return;
   }
 
-  window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(authData));
+  const normalizedSession = normalizeAuthSession(authData);
+
+  window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(normalizedSession));
   window.dispatchEvent(new Event("auth-changed"));
 }
 
@@ -26,7 +28,7 @@ export function getAuthSession() {
   }
 
   try {
-    return JSON.parse(storedValue);
+    return normalizeAuthSession(JSON.parse(storedValue));
   } catch {
     return null;
   }
@@ -43,4 +45,31 @@ export function clearAuthSession() {
 
 export function isAdminUser(user) {
   return user?.role === "admin";
+}
+
+export function hasAuthToken(session) {
+  return Boolean(session?.token);
+}
+
+export function canUseAdminFeatures(session) {
+  return hasAuthToken(session) && isAdminUser(session?.user);
+}
+
+function normalizeAuthSession(authData) {
+  if (!authData || typeof authData !== "object") {
+    return null;
+  }
+
+  const user = authData.user && typeof authData.user === "object" ? authData.user : null;
+  const token = typeof authData.token === "string" ? authData.token : "";
+
+  if (!user) {
+    return null;
+  }
+
+  return {
+    message: typeof authData.message === "string" ? authData.message : "",
+    token,
+    user
+  };
 }

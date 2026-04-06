@@ -8,6 +8,14 @@ const Review = require("../models/Review");
 
 router.use(authenticateToken, requireAdmin);
 
+function summarizeIssues(issues) {
+  return {
+    openIssues: issues.filter((issue) => issue.status === "open").length,
+    reviewingIssues: issues.filter((issue) => issue.status === "reviewing").length,
+    closedIssues: issues.filter((issue) => issue.status === "resolved").length
+  };
+}
+
 router.get("/dashboard", async (req, res) => {
   try {
     const [properties, reviews, issues] = await Promise.all([
@@ -20,8 +28,7 @@ router.get("/dashboard", async (req, res) => {
       summary: {
         properties: properties.length,
         reviews: reviews.length,
-        openIssues: issues.filter((issue) => issue.status !== "resolved").length,
-        resolvedIssues: issues.filter((issue) => issue.status === "resolved").length
+        ...summarizeIssues(issues)
       },
       properties,
       reviews,

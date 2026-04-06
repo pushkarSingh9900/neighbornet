@@ -2,15 +2,14 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { clearAuthSession, getAuthSession, isAdminUser } from "../lib/auth";
+import { canUseAdminFeatures, clearAuthSession, getAuthSession } from "../lib/auth";
 
 export default function Navbar() {
-  const [user, setUser] = useState(null);
+  const [authSession, setAuthSession] = useState(null);
 
   useEffect(() => {
     function syncAuthState() {
-      const authSession = getAuthSession();
-      setUser(authSession?.user || null);
+      setAuthSession(getAuthSession());
     }
 
     syncAuthState();
@@ -27,6 +26,8 @@ export default function Navbar() {
   function handleLogout() {
     clearAuthSession();
   }
+
+  const user = authSession?.user || null;
 
   return (
     <nav className="border-b border-slate-200 bg-white/90 backdrop-blur">
@@ -57,7 +58,7 @@ export default function Navbar() {
 
           {user ? (
             <>
-              {isAdminUser(user) ? (
+              {canUseAdminFeatures(authSession) ? (
                 <Link
                   href="/admin"
                   className="rounded-full border border-amber-200 bg-amber-50 px-4 py-2 font-semibold text-amber-700 transition hover:bg-amber-100"

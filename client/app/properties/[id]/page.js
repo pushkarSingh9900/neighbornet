@@ -29,7 +29,9 @@ export default function PropertyDetailsPage() {
   const [submittingIssue, setSubmittingIssue] = useState(false);
   const [issueMessage, setIssueMessage] = useState("");
   const [issueError, setIssueError] = useState("");
+  const [adminActionMessage, setAdminActionMessage] = useState("");
   const [currentUser, setCurrentUser] = useState(null);
+  const [authSession, setAuthSession] = useState(null);
   const [formData, setFormData] = useState({
     reviewer_name: "",
     rating: "5",
@@ -52,9 +54,13 @@ export default function PropertyDetailsPage() {
     ? (reviews.reduce((total, review) => total + review.rating, 0) / reviews.length).toFixed(1)
     : null;
   const openIssueCount = issues.filter((issue) => issue.status === "open").length;
+  const reviewingIssueCount = issues.filter((issue) => issue.status === "reviewing").length;
+  const closedIssueCount = issues.filter((issue) => issue.status === "resolved").length;
+  const isAdmin = currentUser?.role === "admin";
 
   useEffect(() => {
     const authSession = getAuthSession();
+    setAuthSession(authSession);
     setCurrentUser(authSession?.user || null);
 
     async function fetchPropertyAndReviews() {
@@ -199,6 +205,84 @@ export default function PropertyDetailsPage() {
     }
   }
 
+  async function handleDeleteReview(reviewId) {
+    try {
+      setAdminActionMessage("");
+      setError("");
+
+      const res = await fetch(`${API_BASE_URL}/api/admin/reviews/${reviewId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${authSession?.token}`
+        }
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Could not remove review");
+      }
+
+      setReviews((currentReviews) => currentReviews.filter((review) => review._id !== reviewId));
+      setAdminActionMessage("Review removed successfully.");
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Could not remove review"));
+    }
+  }
+
+  async function handleIssueStatusChange(issueId, status) {
+    try {
+      setAdminActionMessage("");
+      setError("");
+
+      const res = await fetch(`${API_BASE_URL}/api/admin/issues/${issueId}/status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authSession?.token}`
+        },
+        body: JSON.stringify({ status })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Could not update issue");
+      }
+
+      setIssues((currentIssues) =>
+        currentIssues.map((issue) => (issue._id === issueId ? data.issue : issue))
+      );
+      setAdminActionMessage("Report status updated successfully.");
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Could not update issue"));
+    }
+  }
+
+  async function handleDeleteProperty() {
+    try {
+      setAdminActionMessage("");
+      setError("");
+
+      const res = await fetch(`${API_BASE_URL}/api/admin/properties/${id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${authSession?.token}`
+        }
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Could not remove property");
+      }
+
+      window.location.href = "/properties";
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Could not remove property"));
+    }
+  }
+
   if (loading) {
     return (
       <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
@@ -230,6 +314,28 @@ export default function PropertyDetailsPage() {
         ← Back to properties
       </Link>
 
+      {adminActionMessage ? (
+        <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          {adminActionMessage}
+        </p>
+      ) : null}
+
+      {isAdmin ? (
+        <div className="flex flex-wrap items-center gap-3 rounded-3xl border border-amber-200 bg-amber-50 p-5">
+          <p className="text-sm font-medium text-amber-800">
+            Admin moderation is active on this property.
+          </p>
+
+          <button
+            type="button"
+            onClick={handleDeleteProperty}
+            className="rounded-full bg-red-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-600"
+          >
+            Remove Property
+          </button>
+        </div>
+      ) : null}
+
       <section className="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-sm">
         <div className="bg-gradient-to-r from-teal-500 via-emerald-400 to-cyan-300 px-8 py-10 text-white">
           <p className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-white/80">
@@ -257,6 +363,12 @@ export default function PropertyDetailsPage() {
             </span>
             <span className="rounded-full bg-white/20 px-4 py-2 text-sm font-medium backdrop-blur">
               Open issues: {openIssueCount}
+            </span>
+            <span className="rounded-full bg-white/20 px-4 py-2 text-sm font-medium backdrop-blur">
+              In review: {reviewingIssueCount}
+            </span>
+            <span className="rounded-full bg-white/20 px-4 py-2 text-sm font-medium backdrop-blur">
+              Closed: {closedIssueCount}
             </span>
           </div>
         </div>
@@ -333,6 +445,11 @@ export default function PropertyDetailsPage() {
                 <p className="text-sm font-medium text-slate-500">Open issues</p>
                 <p className="mt-1 text-3xl font-bold text-slate-900">{openIssueCount}</p>
               </div>
+
+              <div className="rounded-2xl bg-white p-4 shadow-sm">
+                <p className="text-sm font-medium text-slate-500">In review</p>
+                <p className="mt-1 text-3xl font-bold text-slate-900">{reviewingIssueCount}</p>
+              </div>
             </div>
           </div>
         </div>
@@ -381,6 +498,18 @@ export default function PropertyDetailsPage() {
                     </div>
 
                     <p className="mt-4 leading-7 text-slate-700">{review.comment}</p>
+
+                    {isAdmin ? (
+                      <div className="mt-4">
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteReview(review._id)}
+                          className="rounded-full bg-red-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-600"
+                        >
+                          Remove Review
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
                 ))
               )}
@@ -506,11 +635,39 @@ export default function PropertyDetailsPage() {
                       </div>
 
                       <div className="rounded-full bg-amber-100 px-3 py-1 text-sm font-semibold text-amber-700 capitalize">
-                        {issue.status}
+                        {issue.status === "resolved" ? "closed" : issue.status}
                       </div>
                     </div>
 
                     <p className="mt-4 leading-7 text-slate-700">{issue.description}</p>
+
+                    {isAdmin ? (
+                      <div className="mt-4 flex flex-wrap gap-3">
+                        <button
+                          type="button"
+                          onClick={() => handleIssueStatusChange(issue._id, "reviewing")}
+                          className="rounded-full border border-slate-200 bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-200"
+                        >
+                          Mark Reviewing
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleIssueStatusChange(issue._id, "resolved")}
+                          className="rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-600"
+                        >
+                          Close Report
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleIssueStatusChange(issue._id, "open")}
+                          className="rounded-full border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-100"
+                        >
+                          Reopen
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
                 ))
               )}
