@@ -20,6 +20,10 @@ const IssueSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  reporter: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User"
+  },
   status: {
     type: String,
     enum: ["open", "reviewing", "resolved"],

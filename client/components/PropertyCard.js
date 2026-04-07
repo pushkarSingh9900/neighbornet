@@ -45,8 +45,11 @@ export default function PropertyCard({ property, isAdmin = false, onDelete, isDe
 
             <div className="rounded-2xl bg-slate-50 p-4">
               <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Posted by</p>
-              <p className="mt-2 font-semibold text-slate-900">
-                {property.created_by || "Anonymous Student"}
+              <p
+                className="mt-2 truncate font-semibold text-slate-900"
+                title={property.created_by || "Student contributor"}
+              >
+                {property.created_by || "Student contributor"}
               </p>
             </div>
           </div>

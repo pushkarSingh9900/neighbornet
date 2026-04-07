@@ -20,6 +20,10 @@ const PropertySchema = new mongoose.Schema({
   },
   created_by: {
     type: String
+  },
+  created_by_user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User"
   }
 }, { timestamps: true });
 

@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const Message = require("../models/Message");
 const User = require("../models/User");
-const { authenticateToken } = require("../middleware/authMiddleware");
+const { authenticateToken, loadCurrentUser, requireActiveUser } = require("../middleware/authMiddleware");
 
 const LAKEHEAD_EMAIL_DOMAIN = "@lakeheadu.ca";
 
@@ -10,11 +10,11 @@ function isLakeheadEmail(email = "") {
   return email.trim().toLowerCase().endsWith(LAKEHEAD_EMAIL_DOMAIN);
 }
 
-router.use(authenticateToken);
+router.use(authenticateToken, loadCurrentUser);
 
 router.get("/contacts", async (req, res) => {
   try {
-    const currentEmail = req.user.email;
+    const currentEmail = req.currentUser.email;
 
     const users = await User.find({ email: { $ne: currentEmail } })
       .select("name email")
@@ -28,7 +28,7 @@ router.get("/contacts", async (req, res) => {
 
 router.get("/conversations", async (req, res) => {
   try {
-    const currentEmail = req.user.email;
+    const currentEmail = req.currentUser.email;
 
     const messages = await Message.find({
       $or: [
@@ -74,7 +74,7 @@ router.get("/conversations", async (req, res) => {
 
 router.get("/conversation/:email", async (req, res) => {
   try {
-    const currentEmail = req.user.email;
+    const currentEmail = req.currentUser.email;
     const participantEmail = decodeURIComponent(req.params.email).trim().toLowerCase();
 
     if (!isLakeheadEmail(participantEmail)) {
@@ -103,9 +103,9 @@ router.get("/conversation/:email", async (req, res) => {
   }
 });
 
-router.post("/send", async (req, res) => {
+router.post("/send", requireActiveUser, async (req, res) => {
   try {
-    const currentEmail = req.user.email;
+    const currentEmail = req.currentUser.email;
     const recipientEmail = req.body?.recipientEmail?.trim().toLowerCase();
     const text = req.body?.text?.trim();
 

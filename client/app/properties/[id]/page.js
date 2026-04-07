@@ -59,6 +59,8 @@ export default function PropertyDetailsPage() {
   const reviewingIssueCount = issues.filter((issue) => issue.status === "reviewing").length;
   const closedIssueCount = issues.filter((issue) => issue.status === "resolved").length;
   const isAdmin = canUseAdminFeatures(authSession);
+  const isLoggedIn = Boolean(authSession?.token);
+  const isBanned = authSession?.user?.status === "banned";
   const propertyImages = property?.image_urls || [];
   const activeImage = propertyImages[selectedImageIndex] || "";
   const hasDistance =
@@ -130,11 +132,11 @@ export default function PropertyDetailsPage() {
       const res = await fetch(`${API_BASE_URL}/api/reviews/add`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authSession?.token}`
         },
         body: JSON.stringify({
           property: id,
-          reviewer_name: formData.reviewer_name,
           rating: Number(formData.rating),
           comment: formData.comment
         })
@@ -189,13 +191,13 @@ export default function PropertyDetailsPage() {
       const res = await fetch(`${API_BASE_URL}/api/issues/add`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authSession?.token}`
         },
         body: JSON.stringify({
           property: id,
           issue_type: issueFormData.issue_type,
-          description: issueFormData.description,
-          reported_by: currentUser?.email || "Anonymous Student"
+          description: issueFormData.description
         })
       });
 
@@ -540,7 +542,7 @@ export default function PropertyDetailsPage() {
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
                         <p className="font-semibold text-slate-900">
-                          {getDisplayValue(review.reviewer_name, "Anonymous Student")}
+                          {getDisplayValue(review.reviewer_name, "Lakehead Student")}
                         </p>
                         <p className="mt-1 text-sm text-slate-500">
                           {new Date(review.createdAt).toLocaleDateString()}
@@ -579,76 +581,97 @@ export default function PropertyDetailsPage() {
               Share your experience
             </h2>
             <p className="mt-3 text-sm leading-6 text-slate-600">
-              Keep this simple for now: name, rating, and one honest comment.
+              Reviews on NeighborNet are verified student submissions only.
             </p>
 
-            <form onSubmit={handleReviewSubmit} className="mt-6 space-y-4">
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Your Name
-                </label>
-                <input
-                  name="reviewer_name"
-                  value={formData.reviewer_name}
-                  onChange={handleInputChange}
-                  placeholder="Optional name"
-                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-emerald-400"
-                />
-              </div>
+            {isLoggedIn && !isBanned ? (
+              <form onSubmit={handleReviewSubmit} className="mt-6 space-y-4">
+                <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                  Reviewing as <span className="font-semibold">{currentUser?.name || "Lakehead Student"}</span>
+                </div>
 
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Rating
-                </label>
-                <select
-                  name="rating"
-                  value={formData.rating}
-                  onChange={handleInputChange}
-                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-emerald-400"
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Rating
+                  </label>
+                  <select
+                    name="rating"
+                    value={formData.rating}
+                    onChange={handleInputChange}
+                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-emerald-400"
+                  >
+                    <option value="5">5 - Excellent</option>
+                    <option value="4">4 - Good</option>
+                    <option value="3">3 - Okay</option>
+                    <option value="2">2 - Poor</option>
+                    <option value="1">1 - Very bad</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Comment
+                  </label>
+                  <textarea
+                    name="comment"
+                    value={formData.comment}
+                    onChange={handleInputChange}
+                    placeholder="What should other students know about this place?"
+                    rows="5"
+                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-emerald-400"
+                    required
+                  />
+                </div>
+
+                {reviewMessage ? (
+                  <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                    {reviewMessage}
+                  </p>
+                ) : null}
+
+                {reviewError ? (
+                  <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {reviewError}
+                  </p>
+                ) : null}
+
+                <button
+                  type="submit"
+                  disabled={submittingReview}
+                  className="w-full rounded-2xl bg-teal-500 px-4 py-3 font-semibold text-white transition hover:bg-teal-600 disabled:cursor-not-allowed disabled:bg-slate-300"
                 >
-                  <option value="5">5 - Excellent</option>
-                  <option value="4">4 - Good</option>
-                  <option value="3">3 - Okay</option>
-                  <option value="2">2 - Poor</option>
-                  <option value="1">1 - Very bad</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Comment
-                </label>
-                <textarea
-                  name="comment"
-                  value={formData.comment}
-                  onChange={handleInputChange}
-                  placeholder="What should other students know about this place?"
-                  rows="5"
-                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-emerald-400"
-                  required
-                />
-              </div>
-
-              {reviewMessage ? (
-                <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-                  {reviewMessage}
+                  {submittingReview ? "Submitting review..." : "Submit Review"}
+                </button>
+              </form>
+            ) : isBanned ? (
+              <div className="mt-6 rounded-3xl border border-red-200 bg-red-50 p-5">
+                <p className="font-semibold text-red-900">Account restricted</p>
+                <p className="mt-2 text-sm leading-6 text-red-800">
+                  {authSession?.user?.moderation_reason || "Your account is currently restricted from posting reviews."}
                 </p>
-              ) : null}
-
-              {reviewError ? (
-                <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">
-                  {reviewError}
+              </div>
+            ) : (
+              <div className="mt-6 rounded-3xl border border-amber-200 bg-amber-50 p-5">
+                <p className="font-semibold text-amber-900">Sign in required</p>
+                <p className="mt-2 text-sm leading-6 text-amber-800">
+                  Only signed-in Lakehead students can leave reviews on NeighborNet.
                 </p>
-              ) : null}
-
-              <button
-                type="submit"
-                disabled={submittingReview}
-                className="w-full rounded-2xl bg-teal-500 px-4 py-3 font-semibold text-white transition hover:bg-teal-600 disabled:cursor-not-allowed disabled:bg-slate-300"
-              >
-                {submittingReview ? "Submitting review..." : "Submit Review"}
-              </button>
-            </form>
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <Link
+                    href="/login"
+                    className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                  >
+                    Log In
+                  </Link>
+                  <Link
+                    href="/signup"
+                    className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-white"
+                  >
+                    Create Account
+                  </Link>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -684,7 +707,7 @@ export default function PropertyDetailsPage() {
                           {issue.issue_type}
                         </p>
                         <p className="mt-1 text-sm text-slate-500">
-                          Reported by {getDisplayValue(issue.reported_by, "Anonymous Student")} on{" "}
+                          Reported by {getDisplayValue(issue.reported_by, "Lakehead Student")} on{" "}
                           {new Date(issue.createdAt).toLocaleDateString()}
                         </p>
                       </div>
@@ -741,66 +764,96 @@ export default function PropertyDetailsPage() {
               know what to expect.
             </p>
 
-            {currentUser ? (
-              <p className="mt-4 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                Reporting as {currentUser.email}
-              </p>
-            ) : null}
-
-            <form onSubmit={handleIssueSubmit} className="mt-6 space-y-4">
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Issue Type
-                </label>
-                <select
-                  name="issue_type"
-                  value={issueFormData.issue_type}
-                  onChange={handleIssueInputChange}
-                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-emerald-400"
-                >
-                  {ISSUE_TYPE_OPTIONS.map((issueTypeOption) => (
-                    <option key={issueTypeOption.value} value={issueTypeOption.value}>
-                      {issueTypeOption.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Description
-                </label>
-                <textarea
-                  name="description"
-                  value={issueFormData.description}
-                  onChange={handleIssueInputChange}
-                  placeholder="Describe the issue students should know about"
-                  rows="5"
-                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-emerald-400"
-                  required
-                />
-              </div>
-
-              {issueMessage ? (
-                <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-                  {issueMessage}
+            {isLoggedIn && !isBanned ? (
+              <>
+                <p className="mt-4 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                  Reporting as <span className="font-semibold">{currentUser?.name || "Lakehead Student"}</span>
                 </p>
-              ) : null}
 
-              {issueError ? (
-                <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">
-                  {issueError}
+                <form onSubmit={handleIssueSubmit} className="mt-6 space-y-4">
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      Issue Type
+                    </label>
+                    <select
+                      name="issue_type"
+                      value={issueFormData.issue_type}
+                      onChange={handleIssueInputChange}
+                      className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-emerald-400"
+                    >
+                      {ISSUE_TYPE_OPTIONS.map((issueTypeOption) => (
+                        <option key={issueTypeOption.value} value={issueTypeOption.value}>
+                          {issueTypeOption.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      Description
+                    </label>
+                    <textarea
+                      name="description"
+                      value={issueFormData.description}
+                      onChange={handleIssueInputChange}
+                      placeholder="Describe the issue students should know about"
+                      rows="5"
+                      className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-emerald-400"
+                      required
+                    />
+                  </div>
+
+                  {issueMessage ? (
+                    <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                      {issueMessage}
+                    </p>
+                  ) : null}
+
+                  {issueError ? (
+                    <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">
+                      {issueError}
+                    </p>
+                  ) : null}
+
+                  <button
+                    type="submit"
+                    disabled={submittingIssue}
+                    className="w-full rounded-2xl bg-slate-900 px-4 py-3 font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                  >
+                    {submittingIssue ? "Reporting issue..." : "Report Issue"}
+                  </button>
+                </form>
+              </>
+            ) : isBanned ? (
+              <div className="mt-6 rounded-3xl border border-red-200 bg-red-50 p-5">
+                <p className="font-semibold text-red-900">Account restricted</p>
+                <p className="mt-2 text-sm leading-6 text-red-800">
+                  {authSession?.user?.moderation_reason || "Your account is currently restricted from reporting issues."}
                 </p>
-              ) : null}
-
-              <button
-                type="submit"
-                disabled={submittingIssue}
-                className="w-full rounded-2xl bg-slate-900 px-4 py-3 font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-              >
-                {submittingIssue ? "Reporting issue..." : "Report Issue"}
-              </button>
-            </form>
+              </div>
+            ) : (
+              <div className="mt-6 rounded-3xl border border-amber-200 bg-amber-50 p-5">
+                <p className="font-semibold text-amber-900">Sign in required</p>
+                <p className="mt-2 text-sm leading-6 text-amber-800">
+                  Only signed-in Lakehead students can submit issue reports on NeighborNet.
+                </p>
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <Link
+                    href="/login"
+                    className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                  >
+                    Log In
+                  </Link>
+                  <Link
+                    href="/signup"
+                    className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-white"
+                  >
+                    Create Account
+                  </Link>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </section>

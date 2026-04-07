@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { API_BASE_URL, getApiErrorMessage } from "../../lib/api";
 import { getAuthSession } from "../../lib/auth";
@@ -18,6 +19,7 @@ function readFileAsDataUrl(file) {
 }
 
 export default function AddProperty() {
+  const [authSession, setAuthSession] = useState(null);
   const [formData, setFormData] = useState({
     area: "",
     rent_range: "",
@@ -28,15 +30,19 @@ export default function AddProperty() {
   });
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [duplicatePropertyId, setDuplicatePropertyId] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const isLoggedIn = Boolean(authSession?.token);
+  const isBanned = authSession?.user?.status === "banned";
 
   useEffect(() => {
     const session = getAuthSession();
+    setAuthSession(session);
 
     if (session?.user?.email) {
       setFormData((currentFormData) => ({
         ...currentFormData,
-        created_by: session.user.email
+        created_by: session.user.name || session.user.email
       }));
     }
   }, []);
@@ -94,11 +100,13 @@ export default function AddProperty() {
       setSubmitting(true);
       setMessage("");
       setError("");
+      setDuplicatePropertyId("");
 
       const res = await fetch(`${API_BASE_URL}/api/properties/add`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authSession?.token}`
         },
         body: JSON.stringify({
           area: formData.area,
@@ -115,6 +123,9 @@ export default function AddProperty() {
       const data = await res.json();
 
       if (!res.ok) {
+        if (res.status === 409 && data.propertyId) {
+          setDuplicatePropertyId(data.propertyId);
+        }
         throw new Error(data.message || "Could not add property");
       }
 
@@ -175,7 +186,36 @@ export default function AddProperty() {
           </p>
         )}
 
-        <form onSubmit={handleSubmit} className="mt-8 space-y-4">
+        {!isLoggedIn ? (
+          <div className="mt-8 rounded-3xl border border-amber-200 bg-amber-50 p-5">
+            <p className="font-semibold text-amber-900">Sign in required</p>
+            <p className="mt-2 text-sm leading-6 text-amber-800">
+              Only signed-in Lakehead students can add new properties to NeighborNet.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <Link
+                href="/login"
+                className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+              >
+                Log In
+              </Link>
+              <Link
+                href="/signup"
+                className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-white"
+              >
+                Create Account
+              </Link>
+            </div>
+          </div>
+        ) : isBanned ? (
+          <div className="mt-8 rounded-3xl border border-red-200 bg-red-50 p-5">
+            <p className="font-semibold text-red-900">Account restricted</p>
+            <p className="mt-2 text-sm leading-6 text-red-800">
+              {authSession?.user?.moderation_reason || "Your account is currently restricted from posting properties."}
+            </p>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="mt-8 space-y-4">
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-700">
               Property Area or Address
@@ -306,6 +346,21 @@ export default function AddProperty() {
             </p>
           ) : null}
 
+          {duplicatePropertyId ? (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-800">
+              <p className="font-semibold">That listing already exists.</p>
+              <p className="mt-1">
+                Open the existing property and add a review or report there instead of posting a duplicate.
+              </p>
+              <Link
+                href={`/properties/${duplicatePropertyId}`}
+                className="mt-3 inline-flex rounded-full bg-slate-900 px-4 py-2 font-semibold text-white transition hover:bg-slate-800"
+              >
+                Open Existing Property
+              </Link>
+            </div>
+          ) : null}
+
           <button
             type="submit"
             disabled={submitting}
@@ -313,7 +368,8 @@ export default function AddProperty() {
           >
             {submitting ? "Adding..." : "Add Property"}
           </button>
-        </form>
+          </form>
+        )}
       </section>
     </div>
   );

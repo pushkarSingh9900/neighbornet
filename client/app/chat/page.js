@@ -20,6 +20,7 @@ export default function ChatPage() {
   const [sending, setSending] = useState(false);
 
   const currentUserEmail = authSession?.user?.email || "";
+  const isBanned = authSession?.user?.status === "banned";
 
   const contactMap = useMemo(
     () =>
@@ -325,6 +326,12 @@ export default function ChatPage() {
         </div>
 
         <div className="space-y-4 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbfc_100%)] px-6 py-6">
+          {isBanned ? (
+            <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">
+              {authSession?.user?.moderation_reason || "Your account is currently restricted from sending messages."}
+            </div>
+          ) : null}
+
           {error ? (
             <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">
               {error}
@@ -386,14 +393,20 @@ export default function ChatPage() {
             <input
               value={messageDraft}
               onChange={(e) => setMessageDraft(e.target.value)}
-              placeholder={activeEmail ? "Write a message..." : "Choose a student first"}
-              disabled={!activeEmail}
+              placeholder={
+                isBanned
+                  ? "Messaging disabled for this account"
+                  : activeEmail
+                    ? "Write a message..."
+                    : "Choose a student first"
+              }
+              disabled={!activeEmail || isBanned}
               className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-emerald-400"
             />
 
             <button
               type="submit"
-              disabled={sending || !activeEmail}
+              disabled={sending || !activeEmail || isBanned}
               className="rounded-2xl bg-teal-500 px-5 py-3 font-semibold text-white transition hover:bg-teal-600 disabled:cursor-not-allowed disabled:bg-slate-300"
             >
               {sending ? "Sending..." : "Send"}

@@ -1,3 +1,5 @@
+import { API_BASE_URL } from "./api";
+
 const AUTH_STORAGE_KEY = "neighbornet-auth";
 const LAKEHEAD_EMAIL_DOMAIN = "@lakeheadu.ca";
 
@@ -11,6 +13,11 @@ export function saveAuthSession(authData) {
   }
 
   const normalizedSession = normalizeAuthSession(authData);
+  const currentSession = getAuthSession();
+
+  if (serializeSession(currentSession) === serializeSession(normalizedSession)) {
+    return;
+  }
 
   window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(normalizedSession));
   window.dispatchEvent(new Event("auth-changed"));
@@ -39,6 +46,10 @@ export function clearAuthSession() {
     return;
   }
 
+  if (!window.localStorage.getItem(AUTH_STORAGE_KEY)) {
+    return;
+  }
+
   window.localStorage.removeItem(AUTH_STORAGE_KEY);
   window.dispatchEvent(new Event("auth-changed"));
 }
@@ -53,6 +64,44 @@ export function hasAuthToken(session) {
 
 export function canUseAdminFeatures(session) {
   return hasAuthToken(session) && isAdminUser(session?.user);
+}
+
+export async function refreshAuthSessionFromServer() {
+  const currentSession = getAuthSession();
+
+  if (!currentSession?.token) {
+    return currentSession;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/auth/me`, {
+      headers: {
+        Authorization: `Bearer ${currentSession.token}`
+      }
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      if (res.status === 401) {
+        clearAuthSession();
+        return null;
+      }
+
+      return currentSession;
+    }
+
+    const updatedSession = normalizeAuthSession(data);
+
+    if (serializeSession(currentSession) !== serializeSession(updatedSession)) {
+      window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(updatedSession));
+      window.dispatchEvent(new Event("auth-changed"));
+    }
+
+    return updatedSession;
+  } catch {
+    return currentSession;
+  }
 }
 
 function normalizeAuthSession(authData) {
@@ -72,4 +121,8 @@ function normalizeAuthSession(authData) {
     token,
     user
   };
+}
+
+function serializeSession(session) {
+  return JSON.stringify(session || null);
 }

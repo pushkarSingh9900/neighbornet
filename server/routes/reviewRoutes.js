@@ -1,13 +1,23 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const router = express.Router();
+const { authenticateToken, loadCurrentUser, requireActiveUser } = require("../middleware/authMiddleware");
 const Property = require("../models/Property");
 const Review = require("../models/Review");
 
+function getUserDisplayName(user) {
+  return (
+    [user?.first_name, user?.last_name].filter(Boolean).join(" ").trim() ||
+    user?.name ||
+    user?.email ||
+    "Lakehead Student"
+  );
+}
+
 // Add Review
-router.post("/add", async (req, res) => {
+router.post("/add", authenticateToken, loadCurrentUser, requireActiveUser, async (req, res) => {
   try {
-    const { property, reviewer_name, rating, comment } = req.body;
+    const { property, rating, comment } = req.body;
 
     if (!property || !rating || !comment) {
       return res.status(400).json({ message: "Property, rating, and comment are required" });
@@ -31,7 +41,8 @@ router.post("/add", async (req, res) => {
 
     const review = new Review({
       property,
-      reviewer_name,
+      reviewer_name: getUserDisplayName(req.currentUser),
+      reviewer: req.currentUser._id,
       rating: parsedRating,
       comment
     });
@@ -40,7 +51,7 @@ router.post("/add", async (req, res) => {
 
     res.status(201).json(review);
   } catch (err) {
-    res.status(500).json(err);
+    res.status(500).json({ message: "Could not submit review" });
   }
 });
 
@@ -57,7 +68,7 @@ router.get("/property/:propertyId", async (req, res) => {
 
     res.json(reviews);
   } catch (err) {
-    res.status(500).json(err);
+    res.status(500).json({ message: "Could not load reviews" });
   }
 });
 

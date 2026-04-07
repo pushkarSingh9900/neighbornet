@@ -9,7 +9,8 @@ import { isLakeheadEmail, saveAuthSession } from "../../lib/auth";
 export default function SignupPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
-    name: "",
+    first_name: "",
+    last_name: "",
     email: "",
     password: "",
     confirmPassword: ""
@@ -53,7 +54,8 @@ export default function SignupPage() {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          name: formData.name,
+          first_name: formData.first_name,
+          last_name: formData.last_name,
           email: formData.email,
           password: formData.password
         })
@@ -115,18 +117,34 @@ export default function SignupPage() {
         </p>
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-4">
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">
-              Full Name
-            </label>
-            <input
-              name="name"
-              value={formData.name}
-              onChange={handleInputChange}
-              placeholder="Your full name"
-              className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-emerald-400"
-              required
-            />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-700">
+                First Name
+              </label>
+              <input
+                name="first_name"
+                value={formData.first_name}
+                onChange={handleInputChange}
+                placeholder="First name"
+                className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-emerald-400"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-700">
+                Last Name
+              </label>
+              <input
+                name="last_name"
+                value={formData.last_name}
+                onChange={handleInputChange}
+                placeholder="Last name"
+                className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-emerald-400"
+                required
+              />
+            </div>
           </div>
 
           <div>

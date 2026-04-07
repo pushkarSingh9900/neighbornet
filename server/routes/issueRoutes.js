@@ -1,6 +1,7 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const router = express.Router();
+const { authenticateToken, loadCurrentUser, requireActiveUser } = require("../middleware/authMiddleware");
 const Property = require("../models/Property");
 const Issue = require("../models/Issue");
 
@@ -14,9 +15,18 @@ const ALLOWED_ISSUE_TYPES = [
   "other"
 ];
 
-router.post("/add", async (req, res) => {
+function getUserDisplayName(user) {
+  return (
+    [user?.first_name, user?.last_name].filter(Boolean).join(" ").trim() ||
+    user?.name ||
+    user?.email ||
+    "Lakehead Student"
+  );
+}
+
+router.post("/add", authenticateToken, loadCurrentUser, requireActiveUser, async (req, res) => {
   try {
-    const { property, issue_type, description, reported_by } = req.body;
+    const { property, issue_type, description } = req.body;
 
     if (!property || !issue_type || !description) {
       return res.status(400).json({ message: "Property, issue type, and description are required" });
@@ -40,7 +50,8 @@ router.post("/add", async (req, res) => {
       property,
       issue_type,
       description,
-      reported_by,
+      reported_by: getUserDisplayName(req.currentUser),
+      reporter: req.currentUser._id,
       status: "open"
     });
 
