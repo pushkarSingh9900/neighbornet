@@ -5,8 +5,8 @@ export default function Layout({ children }) {
     <div className="min-h-screen">
       <Navbar />
 
-      <div className="mx-auto flex w-full max-w-6xl">
-        <main className="w-full px-6 py-8">
+      <div className="mx-auto flex w-full max-w-7xl">
+        <main className="w-full px-4 py-8 sm:px-6">
           {children}
         </main>
       </div>

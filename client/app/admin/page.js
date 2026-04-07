@@ -211,7 +211,7 @@ export default function AdminPage() {
         ) : null}
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <p className="text-sm text-slate-500">Properties</p>
           <p className="mt-3 text-4xl font-bold text-slate-900">{summary.properties}</p>

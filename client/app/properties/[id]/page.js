@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import PropertyImage from "../../../components/PropertyImage";
 import { API_BASE_URL, getApiErrorMessage } from "../../../lib/api";
-import { getAuthSession } from "../../../lib/auth";
+import { canUseAdminFeatures, getAuthSession } from "../../../lib/auth";
 
 const ISSUE_TYPE_OPTIONS = [
   { value: "mold", label: "Mold" },
@@ -32,6 +33,7 @@ export default function PropertyDetailsPage() {
   const [adminActionMessage, setAdminActionMessage] = useState("");
   const [currentUser, setCurrentUser] = useState(null);
   const [authSession, setAuthSession] = useState(null);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [formData, setFormData] = useState({
     reviewer_name: "",
     rating: "5",
@@ -56,12 +58,23 @@ export default function PropertyDetailsPage() {
   const openIssueCount = issues.filter((issue) => issue.status === "open").length;
   const reviewingIssueCount = issues.filter((issue) => issue.status === "reviewing").length;
   const closedIssueCount = issues.filter((issue) => issue.status === "resolved").length;
-  const isAdmin = currentUser?.role === "admin";
+  const isAdmin = canUseAdminFeatures(authSession);
+  const propertyImages = property?.image_urls || [];
+  const activeImage = propertyImages[selectedImageIndex] || "";
+  const hasDistance =
+    property?.distance_to_campus !== undefined &&
+    property?.distance_to_campus !== null &&
+    property?.distance_to_campus !== "";
 
   useEffect(() => {
     const authSession = getAuthSession();
     setAuthSession(authSession);
     setCurrentUser(authSession?.user || null);
+    setSelectedImageIndex(0);
+    setFormData((currentFormData) => ({
+      ...currentFormData,
+      reviewer_name: authSession?.user?.name || ""
+    }));
 
     async function fetchPropertyAndReviews() {
       try {
@@ -135,7 +148,7 @@ export default function PropertyDetailsPage() {
 
       setReviews((currentReviews) => [data, ...currentReviews]);
       setFormData({
-        reviewer_name: "",
+        reviewer_name: currentUser?.name || "",
         rating: "5",
         comment: ""
       });
@@ -347,8 +360,8 @@ export default function PropertyDetailsPage() {
           </h1>
 
           <p className="mt-3 max-w-2xl text-base text-white/90">
-            A student-submitted listing on NeighborNet. This page will later hold reviews,
-            issue reports, and helpful notes for future renters.
+            Explore student reviews, submit issue reports, and use shared housing knowledge
+            before making a rental decision.
           </p>
 
           <div className="mt-6 flex flex-wrap gap-3">
@@ -373,7 +386,42 @@ export default function PropertyDetailsPage() {
           </div>
         </div>
 
-        <div className="grid gap-6 px-8 py-8 lg:grid-cols-[1.5fr_1fr]">
+        <div className="px-8 py-8">
+          <div className="overflow-hidden rounded-[30px] border border-slate-200 bg-slate-100 shadow-sm">
+            <PropertyImage
+              src={activeImage}
+              alt={property.area}
+              overlayLabel="Property Photos"
+              className="h-[380px] w-full"
+            />
+          </div>
+
+          {propertyImages.length > 1 ? (
+            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {propertyImages.map((imageUrl, index) => (
+                <button
+                  key={`${imageUrl}-${index}`}
+                  type="button"
+                  onClick={() => setSelectedImageIndex(index)}
+                  className={`overflow-hidden rounded-[22px] border transition ${
+                    index === selectedImageIndex
+                      ? "border-teal-400 shadow-md"
+                      : "border-slate-200 hover:border-slate-300"
+                  }`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={imageUrl}
+                    alt={`${property.area} view ${index + 1}`}
+                    className="h-28 w-full object-cover"
+                  />
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="grid gap-6 px-8 pb-8 lg:grid-cols-[1.5fr_1fr]">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
               <p className="text-sm font-medium text-slate-500">Rent Range</p>
@@ -398,10 +446,10 @@ export default function PropertyDetailsPage() {
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
               <p className="text-sm font-medium text-slate-500">Distance To Campus</p>
               <p className="mt-3 text-2xl font-semibold text-slate-900">
-                {property.distance_to_campus ? `${property.distance_to_campus} km` : "Not added yet"}
+                {hasDistance ? `${property.distance_to_campus} km` : "Not added yet"}
               </p>
               <p className="mt-2 text-sm text-slate-500">
-                You can add this later when you expand the add-property form.
+                Student contributors can share how close the property is to campus.
               </p>
             </div>
 
@@ -411,7 +459,7 @@ export default function PropertyDetailsPage() {
                 {getDisplayValue(property.created_by, "Anonymous")}
               </p>
               <p className="mt-2 text-sm text-slate-500">
-                Right now this is simple. Later this can come from user accounts.
+                Listings keep track of the student who posted them.
               </p>
             </div>
           </div>
@@ -427,6 +475,13 @@ export default function PropertyDetailsPage() {
               This property can now collect reviews from students. That gives NeighborNet
               its core value: real experiences tied to a real place.
             </p>
+
+            <Link
+              href="/chat"
+              className="mt-6 inline-flex rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+            >
+              Open Student Chat
+            </Link>
 
             <div className="mt-6 space-y-3">
               <div className="rounded-2xl bg-white p-4 shadow-sm">

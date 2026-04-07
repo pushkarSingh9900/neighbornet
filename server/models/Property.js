@@ -14,6 +14,10 @@ const PropertySchema = new mongoose.Schema({
   property_type: {
     type: String
   },
+  image_urls: {
+    type: [String],
+    default: []
+  },
   created_by: {
     type: String
   }
