@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import PasswordField from "../../components/PasswordField";
 import { API_BASE_URL, getApiErrorMessage } from "../../lib/api";
 import { isLakeheadEmail, saveAuthSession } from "../../lib/auth";
 
@@ -162,35 +163,25 @@ export default function SignupPage() {
             />
           </div>
 
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">
-              Password
-            </label>
-            <input
-              name="password"
-              type="password"
-              value={formData.password}
-              onChange={handleInputChange}
-              placeholder="At least 6 characters"
-              className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-emerald-400"
-              required
-            />
-          </div>
+          <PasswordField
+            label="Password"
+            name="password"
+            value={formData.password}
+            onChange={handleInputChange}
+            placeholder="At least 6 characters"
+            autoComplete="new-password"
+            required
+          />
 
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">
-              Confirm Password
-            </label>
-            <input
-              name="confirmPassword"
-              type="password"
-              value={formData.confirmPassword}
-              onChange={handleInputChange}
-              placeholder="Re-enter your password"
-              className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-emerald-400"
-              required
-            />
-          </div>
+          <PasswordField
+            label="Confirm Password"
+            name="confirmPassword"
+            value={formData.confirmPassword}
+            onChange={handleInputChange}
+            placeholder="Re-enter your password"
+            autoComplete="new-password"
+            required
+          />
 
           {message ? (
             <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
